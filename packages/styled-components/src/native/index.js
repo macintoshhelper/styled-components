@@ -16,7 +16,7 @@ import type { Target } from '../types';
 const reactNative = require('react-native');
 
 const InlineStyle = _InlineStyle(reactNative.StyleSheet);
-const StyledNativeComponent = _StyledNativeComponent(InlineStyle);
+const StyledNativeComponent = _StyledNativeComponent(InlineStyle, { useWindowDimensions: reactNative.useWindowDimensions });
 const styled = (tag: Target) => constructWithOptions(StyledNativeComponent, tag);
 
 /* React native lazy-requires each of these modules for some reason, so let's

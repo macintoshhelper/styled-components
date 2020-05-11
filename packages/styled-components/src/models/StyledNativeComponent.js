@@ -1,6 +1,6 @@
 import React, { createContext, createElement, Component } from 'react';
 import hoist from 'hoist-non-react-statics';
-import { Dimensions } from 'react-native';
+
 import merge from '../utils/mixinDeep';
 import determineTheme from '../utils/determineTheme';
 import { EMPTY_ARRAY, EMPTY_OBJECT } from '../utils/empties';
@@ -22,19 +22,17 @@ const FontSizeContext = createContext(16)
 const validAttr = () => true;
 
 /** HOC that will apply the screen size to the styles defined with vmin, vmax, vw, vh units */
-const withScreenSize = Comp => ({vstyles = {}, generatedStyles = {}, ...props}) => {
-  const [ size, setSize ] = React.useState(Dimensions.get('window'))
-  React.useEffect(() => {
-    const sizeListener = () => {
-      const { width, height } = Dimensions.get('window')
-      setSize({ width, height })
-    }
-    Dimensions.addEventListener('change', sizeListener)
-    return () => Dimensions.removeEventListener('change', sizeListener)
-  }, [setSize])
+const withScreenSize = (Comp, hooks) => ({ vstyles = {}, generatedStyles = {}, ...props }) => {
+  const { useWindowDimensions } = hooks;
+
+  if (!useWindowDimensions) {
+    return <Comp generatedStyles={generatedStyles} {...props} />;
+  }
+
+  const { width, height } = useWindowDimensions();
+
   const { vmin = [], vmax = [], vw = [], vh = [] } = vstyles
   const styles = {...generatedStyles}
-  const { width, height } = size
   vmin.forEach(key => styles[key]*=Math.min(width, height)/100)
   vmax.forEach(key => styles[key]*=Math.max(width, height)/100)
   vw.forEach(key => styles[key]*=width/100)
@@ -128,7 +126,7 @@ class StyledNativeComponent extends Component<*, *> {
             ...props
           } = this.props;
 
-          const { defaultProps, target } = forwardedComponent;
+          const { defaultProps, target, hooks } = forwardedComponent;
           const elementToBeRendered =
             this.attrs.$as || this.attrs.as || transientAsProp || renderAs || target;
 
@@ -147,7 +145,7 @@ class StyledNativeComponent extends Component<*, *> {
             ? { vw: this.vwStyles, vh: this.vhStyles, vmin: this.vminStyles, vmax: this.vmaxStyles }
             : undefined
           if(vstyles) {
-            FinalComponent = withScreenSize(FinalComponent)
+            FinalComponent = withScreenSize(FinalComponent, hooks)
           }
 
           // Apply em units
@@ -229,7 +227,7 @@ class StyledNativeComponent extends Component<*, *> {
   }
 }
 
-export default (InlineStyle: Function) => {
+export default (InlineStyle: Function, hooks: { [string]: Function }) => {
   const createStyledNativeComponent = (target: Target, options: Object, rules: RuleSet) => {
     const {
       attrs = EMPTY_ARRAY,
@@ -290,6 +288,8 @@ export default (InlineStyle: Function) => {
       isTargetStyledComp ? target.inlineStyle.rules.concat(rules) : rules
     );
 
+    WrappedStyledNativeComponent.hooks = hooks;
+
     // $FlowFixMe
     WrappedStyledNativeComponent.styledComponentId = 'StyledNativeComponent';
     // $FlowFixMe
@@ -328,6 +328,7 @@ export default (InlineStyle: Function) => {
         displayName: true,
         shouldForwardProp: true,
         inlineStyle: true,
+        hooks: true,
         styledComponentId: true,
         target: true,
         withComponent: true,
